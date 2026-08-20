@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Input Latency Tester</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>Input Latency Tester</h1>
+      </header>
+
+      <section class="controls">
+        <button id="start-btn" type="button">Start</button>
+        <button id="stop-btn" type="button" disabled>Stop</button>
+        <button id="reset-btn" type="button">Reset</button>
+        <button id="copy-json-btn" type="button">Copy JSON</button>
+        <button id="download-csv-btn" type="button">Download CSV</button>
+        <p id="status" class="status">Idle</p>
+      </section>
+
+      <section class="stats-grid">
+        <div class="stat"><span>Current Input</span><strong id="current-input-value">-</strong></div>
+        <div class="stat"><span>Samples</span><strong id="samples-value">0</strong></div>
+        <div class="stat"><span>Latest</span><strong id="latest-value">-</strong></div>
+        <div class="stat"><span>Min</span><strong id="min-value">-</strong></div>
+        <div class="stat"><span>Avg</span><strong id="avg-value">-</strong></div>
+        <div class="stat"><span>Max</span><strong id="max-value">-</strong></div>
+      </section>
+
+      <section class="target-wrap">
+        <div id="test-target" tabindex="0" aria-label="Latency test target">
+          Tap / click / press a key / gamepad button while running
+        </div>
+      </section>
+
+      <section>
+        <h2>Input log</h2>
+        <div id="input-log" class="input-log" aria-live="polite" aria-label="Input event log">
+          <p class="empty-state">No samples yet.</p>
+        </div>
+      </section>
+
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
