@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Input Latency Tester</title>
+    <title>Input Tester</title>
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
     <main class="app">
       <header>
-        <h1>Input Latency Tester</h1>
+        <h1>Input Tester</h1>
       </header>
 
       <section class="controls">
@@ -23,15 +23,14 @@
 
       <section class="stats-grid">
         <div class="stat"><span>Current Input</span><strong id="current-input-value">-</strong></div>
-        <div class="stat"><span>Samples</span><strong id="samples-value">0</strong></div>
-        <div class="stat"><span>Latest</span><strong id="latest-value">-</strong></div>
-        <div class="stat"><span>Min</span><strong id="min-value">-</strong></div>
-        <div class="stat"><span>Avg</span><strong id="avg-value">-</strong></div>
-        <div class="stat"><span>Max</span><strong id="max-value">-</strong></div>
+        <div class="stat"><span>Events</span><strong id="samples-value">0</strong></div>
+        <div class="stat"><span>Latest Source</span><strong id="latest-value">-</strong></div>
+        <div class="stat"><span>First Time</span><strong id="min-value">-</strong></div>
+        <div class="stat"><span>Latest Time</span><strong id="avg-value">-</strong></div>
       </section>
 
       <section class="target-wrap">
-        <div id="test-target" tabindex="0" aria-label="Latency test target">
+        <div id="test-target" tabindex="0" aria-label="Input test target">
           Tap / click / press a key / gamepad button while running
         </div>
       </section>

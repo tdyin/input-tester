@@ -6,6 +6,10 @@ export class InputCapture {
     this.gamepadPollRafId = null;
     this.gamepadButtonSnapshots = new Map();
     this.gamepadAxisSnapshots = new Map();
+    this.xrSession = null;
+    this.xrReferenceSpace = null;
+    this.xrFrameId = null;
+    this.xrInputSnapshots = new Map();
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     this.boundOnPointerDown = this.onPointerDown.bind(this);
     this.boundOnMouseDown = this.onMouseDown.bind(this);
@@ -17,6 +21,12 @@ export class InputCapture {
     this.boundOnWindowMouseNavigationButtons = this.onWindowMouseNavigationButtons.bind(this);
     this.boundOnWindowAuxClick = this.onWindowAuxClick.bind(this);
     this.boundPollGamepads = this.pollGamepads.bind(this);
+    this.boundOnXrSessionEnd = this.onXrSessionEnd.bind(this);
+    this.boundOnXrSelectStart = this.onXrSelectStart.bind(this);
+    this.boundOnXrSelectEnd = this.onXrSelectEnd.bind(this);
+    this.boundOnXrSqueezeStart = this.onXrSqueezeStart.bind(this);
+    this.boundOnXrSqueezeEnd = this.onXrSqueezeEnd.bind(this);
+    this.boundOnXrFrame = this.onXrFrame.bind(this);
   }
 
   start() {
@@ -50,6 +60,7 @@ export class InputCapture {
         this.targetElement.removeEventListener("pointerdown", this.boundOnPointerDown, { passive: true }),
       );
       this.startGamepadPolling();
+      this.startWebXrSession();
       return;
     }
 
@@ -63,6 +74,7 @@ export class InputCapture {
     );
 
     this.startGamepadPolling();
+    this.startWebXrSession();
   }
 
   stop() {
@@ -71,6 +83,7 @@ export class InputCapture {
     }
     this.handlers = [];
     this.stopGamepadPolling();
+    this.stopWebXrSession();
   }
 
   onKeyDown(event) {
@@ -93,7 +106,7 @@ export class InputCapture {
   }
 
   onWheel(event) {
-    this.onInput("wheel", event.timeStamp, formatWheelInput(event));
+    this.onInput("mouse", event.timeStamp, formatWheelInput(event));
   }
 
   onContextMenu(event) {
@@ -189,6 +202,7 @@ export class InputCapture {
         this.gamepadButtonSnapshots.delete(knownIndex);
       }
     }
+
     for (const knownIndex of this.gamepadAxisSnapshots.keys()) {
       if (!seenGamepadIndexes.has(knownIndex)) {
         this.gamepadAxisSnapshots.delete(knownIndex);
@@ -197,6 +211,144 @@ export class InputCapture {
 
     if (this.gamepadPollRafId !== null) {
       this.gamepadPollRafId = requestAnimationFrame(this.boundPollGamepads);
+    }
+  }
+
+  async startWebXrSession() {
+    if (typeof navigator.xr?.requestSession !== "function") {
+      return;
+    }
+    if (this.xrSession) {
+      return;
+    }
+
+    try {
+      const session = await navigator.xr.requestSession("immersive-vr", {
+        optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"],
+      });
+      this.attachXrSession(session);
+    } catch (error) {
+      if (
+        error?.name === "NotSupportedError" ||
+        error?.name === "NotAllowedError" ||
+        error?.name === "SecurityError" ||
+        error?.name === "InvalidStateError"
+      ) {
+        return;
+      }
+      console.error("Failed to start WebXR session", error);
+    }
+  }
+
+  async attachXrSession(session) {
+    this.xrSession = session;
+    this.xrInputSnapshots.clear();
+    session.addEventListener("end", this.boundOnXrSessionEnd);
+    session.addEventListener("selectstart", this.boundOnXrSelectStart);
+    session.addEventListener("selectend", this.boundOnXrSelectEnd);
+    session.addEventListener("squeezestart", this.boundOnXrSqueezeStart);
+    session.addEventListener("squeezeend", this.boundOnXrSqueezeEnd);
+
+    try {
+      this.xrReferenceSpace = await session.requestReferenceSpace("local");
+      if (this.xrSession === session) {
+        this.xrFrameId = session.requestAnimationFrame(this.boundOnXrFrame);
+      }
+    } catch (error) {
+      console.error("Failed to initialize WebXR reference space", error);
+    }
+  }
+
+  stopWebXrSession() {
+    if (!this.xrSession) {
+      return;
+    }
+
+    const session = this.xrSession;
+    this.detachXrSessionListeners(session);
+    this.xrSession = null;
+    this.xrReferenceSpace = null;
+    this.xrFrameId = null;
+    this.xrInputSnapshots.clear();
+    session.end().catch((error) => {
+      console.error("Failed to end WebXR session", error);
+    });
+  }
+
+  onXrSessionEnd() {
+    if (!this.xrSession) {
+      return;
+    }
+
+    const session = this.xrSession;
+    this.detachXrSessionListeners(session);
+    this.xrSession = null;
+    this.xrReferenceSpace = null;
+    this.xrFrameId = null;
+    this.xrInputSnapshots.clear();
+  }
+
+  detachXrSessionListeners(session) {
+    session.removeEventListener("end", this.boundOnXrSessionEnd);
+    session.removeEventListener("selectstart", this.boundOnXrSelectStart);
+    session.removeEventListener("selectend", this.boundOnXrSelectEnd);
+    session.removeEventListener("squeezestart", this.boundOnXrSqueezeStart);
+    session.removeEventListener("squeezeend", this.boundOnXrSqueezeEnd);
+  }
+
+  onXrSelectStart(event) {
+    this.emitXrAction(event, "selectstart");
+  }
+
+  onXrSelectEnd(event) {
+    this.emitXrAction(event, "selectend");
+  }
+
+  onXrSqueezeStart(event) {
+    this.emitXrAction(event, "squeezestart");
+  }
+
+  onXrSqueezeEnd(event) {
+    this.emitXrAction(event, "squeezeend");
+  }
+
+  emitXrAction(event, actionName) {
+    this.onInput("xr", event.timeStamp, formatXrActionInput(event.inputSource, actionName));
+  }
+
+  onXrFrame(time, frame) {
+    const session = this.xrSession;
+    if (!session || !this.xrReferenceSpace) {
+      return;
+    }
+
+    for (const inputSource of session.inputSources) {
+      const space = inputSource.gripSpace || inputSource.targetRaySpace;
+      if (!space) {
+        continue;
+      }
+      const pose = frame.getPose(space, this.xrReferenceSpace);
+      if (!pose) {
+        continue;
+      }
+
+      const currentPose = toPoseSnapshot(pose, time);
+      const previousPose = this.xrInputSnapshots.get(inputSource);
+      this.xrInputSnapshots.set(inputSource, currentPose);
+
+      if (!previousPose) {
+        continue;
+      }
+
+      if (!hasMeaningfulPoseDelta(previousPose, currentPose)) {
+        continue;
+      }
+
+      this.onInput("xr", time, formatXrPoseInput(inputSource, currentPose, previousPose));
+    }
+
+    if (this.xrSession === session) {
+      this.xrFrameId = session.requestAnimationFrame(this.boundOnXrFrame);
     }
   }
 }
@@ -339,4 +491,61 @@ function isEventInsideTargetBounds(event, targetElement) {
     event.clientY >= rect.top &&
     event.clientY <= rect.bottom
   );
+}
+
+function formatXrActionInput(inputSource, actionName) {
+  return `${describeXrInputSource(inputSource)} ${actionName}`;
+}
+
+function formatXrPoseInput(inputSource, currentPose, previousPose) {
+  const distanceMm = Math.round(positionDistance(previousPose, currentPose) * 1000);
+  const rotationDeg = Math.round((orientationDistance(previousPose, currentPose) * 180) / Math.PI);
+  return `${describeXrInputSource(inputSource)} moved ${distanceMm}mm rot ${rotationDeg}deg`;
+}
+
+function describeXrInputSource(inputSource) {
+  const handedness = inputSource?.handedness && inputSource.handedness !== "none" ? inputSource.handedness : "unknown";
+  const targetRayMode = inputSource?.targetRayMode || "unknown";
+  return `XR ${toTitleCase(handedness)} ${targetRayMode}`;
+}
+
+function toPoseSnapshot(pose, timestamp) {
+  return {
+    timestamp,
+    px: pose.transform.position.x,
+    py: pose.transform.position.y,
+    pz: pose.transform.position.z,
+    ox: pose.transform.orientation.x,
+    oy: pose.transform.orientation.y,
+    oz: pose.transform.orientation.z,
+    ow: pose.transform.orientation.w,
+  };
+}
+
+function hasMeaningfulPoseDelta(previousPose, currentPose) {
+  const minIntervalMs = 80;
+  if (currentPose.timestamp - previousPose.timestamp < minIntervalMs) {
+    return false;
+  }
+
+  const minDistanceMeters = 0.01;
+  if (positionDistance(previousPose, currentPose) >= minDistanceMeters) {
+    return true;
+  }
+
+  const minRotationRadians = 0.08;
+  return orientationDistance(previousPose, currentPose) >= minRotationRadians;
+}
+
+function positionDistance(a, b) {
+  const dx = b.px - a.px;
+  const dy = b.py - a.py;
+  const dz = b.pz - a.pz;
+  return Math.hypot(dx, dy, dz);
+}
+
+function orientationDistance(a, b) {
+  const dot = Math.abs(a.ox * b.ox + a.oy * b.oy + a.oz * b.oz + a.ow * b.ow);
+  const clampedDot = Math.min(1, Math.max(-1, dot));
+  return 2 * Math.acos(clampedDot);
 }

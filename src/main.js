@@ -1,6 +1,4 @@
-import { LatencyEngine } from "./latency-engine.js";
 import { InputCapture } from "./input-capture.js";
-import { StatsTracker } from "./stats.js";
 
 const startBtn = document.getElementById("start-btn");
 const stopBtn = document.getElementById("stop-btn");
@@ -16,10 +14,8 @@ const samplesValueEl = document.getElementById("samples-value");
 const latestValueEl = document.getElementById("latest-value");
 const minValueEl = document.getElementById("min-value");
 const avgValueEl = document.getElementById("avg-value");
-const maxValueEl = document.getElementById("max-value");
 
 const INPUT_CUE_DURATION_MS = 140;
-const stats = new StatsTracker();
 const eventLog = [];
 let running = false;
 let currentInputType = null;
@@ -28,54 +24,82 @@ let renderScheduled = false;
 let renderedLogCount = 0;
 let logListEl = null;
 let inputCueTimeoutId = null;
+let firstInputTime = null;
+let latestInputTime = null;
+const localDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  fractionalSecondDigits: 3,
+  hour12: false,
+});
 
-const latencyEngine = new LatencyEngine((sample) => {
+const inputCapture = new InputCapture(testTarget, (eventType, eventTimeStamp, inputValue) => {
   if (!running) {
     return;
   }
 
+  const inputTime = normalizeEventTimestamp(eventTimeStamp);
+  const sample = {
+    eventType,
+    inputValue: inputValue || null,
+    inputTime,
+  };
+
   currentInputType = sample.eventType;
-  currentInputValue = sample.inputValue || null;
-  stats.addSample(sample.latencyMs);
+  currentInputValue = sample.inputValue;
   eventLog.push(sample);
+  if (firstInputTime === null) {
+    firstInputTime = sample.inputTime;
+  }
+  latestInputTime = sample.inputTime;
   flashInputCue();
   scheduleRender();
 });
 
-const inputCapture = new InputCapture(testTarget, (eventType, eventTimeStamp, inputValue) => {
-  latencyEngine.recordInput(eventType, eventTimeStamp, inputValue);
-});
-
-function formatMs(value) {
-  if (value === null || value === undefined) {
+function formatAbsoluteLocalTime(epochMs) {
+  if (epochMs === null || epochMs === undefined) {
     return "-";
   }
-  return `${value.toFixed(2)} ms`;
+  return localDateTimeFormatter.format(new Date(epochMs));
 }
 
-function formatInputType(eventType) {
+function formatSource(eventType) {
   if (!eventType) {
     return "-";
   }
-  return eventType.slice(0, 1).toUpperCase() + eventType.slice(1);
+
+  const sourceLabels = {
+    keyboard: "Keyboard",
+    mouse: "Mouse",
+    touch: "Touch",
+    pen: "Pen",
+    gamepad: "Gamepad",
+    xr: "WebXR",
+    pointer: "Pointer",
+  };
+
+  return sourceLabels[eventType] || eventType.slice(0, 1).toUpperCase() + eventType.slice(1);
 }
 
 function formatCurrentInput(eventType, inputValue) {
   if (inputValue) {
     return inputValue;
   }
-  return formatInputType(eventType);
+  return formatSource(eventType);
 }
 
 function render() {
   renderScheduled = false;
-  const summary = stats.getSummary();
+  const sampleCount = eventLog.length;
   currentInputValueEl.textContent = formatCurrentInput(currentInputType, currentInputValue);
-  samplesValueEl.textContent = String(summary.count);
-  latestValueEl.textContent = formatMs(summary.latest);
-  minValueEl.textContent = formatMs(summary.min);
-  avgValueEl.textContent = formatMs(summary.avg);
-  maxValueEl.textContent = formatMs(summary.max);
+  samplesValueEl.textContent = String(sampleCount);
+  latestValueEl.textContent = formatSource(currentInputType);
+  minValueEl.textContent = formatAbsoluteLocalTime(firstInputTime);
+  avgValueEl.textContent = formatAbsoluteLocalTime(latestInputTime);
 
   renderInputLog();
 }
@@ -101,8 +125,7 @@ function renderInputLog() {
     item.className = "input-log-entry";
     item.textContent =
       `${i + 1}. input=${formatCurrentInput(entry.eventType, entry.inputValue)} ` +
-      `source=${entry.eventType} at=${entry.inputTime.toFixed(3)}ms ` +
-      `paint=${entry.paintTime.toFixed(3)}ms latency=${entry.latencyMs.toFixed(3)}ms`;
+      `source=${formatSource(entry.eventType)} at=${formatAbsoluteLocalTime(entry.inputTime)}`;
     logListEl.appendChild(item);
   }
 
@@ -156,10 +179,11 @@ function setRunning(next) {
 }
 
 function resetAll() {
-  stats.reset();
   eventLog.length = 0;
   currentInputType = null;
   currentInputValue = null;
+  firstInputTime = null;
+  latestInputTime = null;
   renderedLogCount = 0;
   logListEl = null;
   if (inputCueTimeoutId !== null) {
@@ -174,8 +198,13 @@ function resetAll() {
 async function copyJson() {
   const payload = {
     generatedAt: new Date().toISOString(),
-    summary: stats.getSummary(),
-    bins: stats.getBins(),
+    summary: {
+      count: eventLog.length,
+      firstInputTime,
+      firstInputTimeLocal: formatAbsoluteLocalTime(firstInputTime),
+      latestInputTime,
+      latestInputTimeLocal: formatAbsoluteLocalTime(latestInputTime),
+    },
     samples: eventLog,
   };
 
@@ -184,15 +213,14 @@ async function copyJson() {
 }
 
 function downloadCsv() {
-  const header = "index,inputValue,eventType,inputTime,paintTime,latencyMs";
+  const header = "index,inputValue,eventType,inputTimeLocal,inputTimeEpochMs";
   const rows = eventLog.map((entry, i) =>
     [
       i + 1,
       escapeCsv(formatCurrentInput(entry.eventType, entry.inputValue)),
-      escapeCsv(entry.eventType),
+      escapeCsv(formatSource(entry.eventType)),
+      escapeCsv(formatAbsoluteLocalTime(entry.inputTime)),
       entry.inputTime.toFixed(3),
-      entry.paintTime.toFixed(3),
-      entry.latencyMs.toFixed(3),
     ].join(","),
   );
   const csv = [header, ...rows].join("\n");
@@ -200,7 +228,7 @@ function downloadCsv() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "latency-samples.csv";
+  link.download = "input-events.csv";
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -214,6 +242,18 @@ function escapeCsv(value) {
     return text;
   }
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function normalizeEventTimestamp(eventTimeStamp) {
+  if (!Number.isFinite(eventTimeStamp)) {
+    return Date.now();
+  }
+
+  if (eventTimeStamp > 1e12) {
+    return eventTimeStamp;
+  }
+
+  return performance.timeOrigin + eventTimeStamp;
 }
 
 startBtn.addEventListener("click", () => setRunning(true));
