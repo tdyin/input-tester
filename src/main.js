@@ -3,9 +3,11 @@ import { InputCapture } from "./input-capture.js";
 const startBtn = document.getElementById("start-btn");
 const stopBtn = document.getElementById("stop-btn");
 const resetBtn = document.getElementById("reset-btn");
+const fullscreenBtn = document.getElementById("fullscreen-btn");
 const copyJsonBtn = document.getElementById("copy-json-btn");
 const downloadCsvBtn = document.getElementById("download-csv-btn");
 const testTarget = document.getElementById("test-target");
+const targetWrapEl = document.querySelector(".target-wrap");
 const inputLogEl = document.getElementById("input-log");
 const statusEl = document.getElementById("status");
 const currentInputValueEl = document.getElementById("current-input-value");
@@ -256,14 +258,72 @@ function normalizeEventTimestamp(eventTimeStamp) {
   return performance.timeOrigin + eventTimeStamp;
 }
 
+function getFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function isTargetWrapFullscreen() {
+  const fullscreenElement = getFullscreenElement();
+  return fullscreenElement === targetWrapEl;
+}
+
+function updateFullscreenButtonState() {
+  const isFullscreen = isTargetWrapFullscreen();
+  fullscreenBtn.textContent = isFullscreen ? "Exit Fullscreen" : "Fullscreen Input";
+  fullscreenBtn.setAttribute("aria-pressed", String(isFullscreen));
+}
+
+function requestTargetWrapFullscreen() {
+  if (!targetWrapEl) {
+    throw new Error("Input area container was not found.");
+  }
+  const requestFullscreen =
+    targetWrapEl.requestFullscreen || targetWrapEl.webkitRequestFullscreen;
+  if (!requestFullscreen) {
+    throw new Error("Fullscreen is not supported in this browser.");
+  }
+  return requestFullscreen.call(targetWrapEl);
+}
+
+function exitDocumentFullscreen() {
+  const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!exitFullscreen) {
+    throw new Error("Cannot exit fullscreen in this browser.");
+  }
+  return exitFullscreen.call(document);
+}
+
+async function toggleTargetWrapFullscreen() {
+  if (isTargetWrapFullscreen()) {
+    await exitDocumentFullscreen();
+    return;
+  }
+  await requestTargetWrapFullscreen();
+}
+
+function onFullscreenChange() {
+  updateFullscreenButtonState();
+  if (isTargetWrapFullscreen()) {
+    testTarget.focus({ preventScroll: true });
+  }
+}
+
 startBtn.addEventListener("click", () => setRunning(true));
 stopBtn.addEventListener("click", () => setRunning(false));
 resetBtn.addEventListener("click", resetAll);
+fullscreenBtn.addEventListener("click", () => {
+  toggleTargetWrapFullscreen().catch((error) => {
+    statusEl.textContent = `Fullscreen error: ${error.message}`;
+  });
+});
 copyJsonBtn.addEventListener("click", () => {
   copyJson().catch((error) => {
     statusEl.textContent = `Clipboard error: ${error.message}`;
   });
 });
 downloadCsvBtn.addEventListener("click", downloadCsv);
+document.addEventListener("fullscreenchange", onFullscreenChange);
+document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 
+updateFullscreenButtonState();
 render();

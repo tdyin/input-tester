@@ -51,8 +51,9 @@ All captured data can be exported as JSON or CSV for analysis.
 3. Watch the input log update in real-time with all captured events
 4. Use **Stop** to pause capturing
 5. Use **Reset** to clear all recorded data
-6. Use **Copy JSON** to copy all data to your clipboard
-7. Use **Download CSV** to save the data as a CSV file
+6. Use **Fullscreen Input** to make the capture area fill the screen (press `Esc` to exit)
+7. Use **Copy JSON** to copy all data to your clipboard
+8. Use **Download CSV** to save the data as a CSV file
 
 ## Project Structure
 
