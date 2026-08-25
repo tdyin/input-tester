@@ -82,6 +82,19 @@ button:disabled {
   display: grid;
 }
 
+.target-wrap:fullscreen,
+.target-wrap:-webkit-full-screen {
+  height: 100%;
+  padding: 16px;
+  background: #0f172a;
+}
+
+.target-wrap:fullscreen #test-target,
+.target-wrap:-webkit-full-screen #test-target {
+  min-height: 100%;
+  border-color: #60a5fa;
+}
+
 #test-target {
   border: 2px dashed #94a3b8;
   border-radius: 12px;
