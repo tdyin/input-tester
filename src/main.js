@@ -28,6 +28,7 @@ let logListEl = null;
 let inputCueTimeoutId = null;
 let firstInputTime = null;
 let latestInputTime = null;
+let simulatedFullscreenActive = false;
 const localDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
   month: "2-digit",
@@ -267,8 +268,19 @@ function isTargetWrapFullscreen() {
   return fullscreenElement === targetWrapEl;
 }
 
+function isInputAreaFullscreen() {
+  return isTargetWrapFullscreen() || simulatedFullscreenActive;
+}
+
+function supportsNativeFullscreen() {
+  if (!targetWrapEl) {
+    return false;
+  }
+  return Boolean(targetWrapEl.requestFullscreen || targetWrapEl.webkitRequestFullscreen);
+}
+
 function updateFullscreenButtonState() {
-  const isFullscreen = isTargetWrapFullscreen();
+  const isFullscreen = isInputAreaFullscreen();
   fullscreenBtn.textContent = isFullscreen ? "Exit Fullscreen" : "Fullscreen Input";
   fullscreenBtn.setAttribute("aria-pressed", String(isFullscreen));
 }
@@ -293,19 +305,72 @@ function exitDocumentFullscreen() {
   return exitFullscreen.call(document);
 }
 
+function enterSimulatedFullscreen() {
+  if (!targetWrapEl) {
+    throw new Error("Input area container was not found.");
+  }
+  simulatedFullscreenActive = true;
+  document.body.classList.add("simulated-fullscreen-active");
+  targetWrapEl.classList.add("simulated-fullscreen");
+}
+
+function exitSimulatedFullscreen() {
+  simulatedFullscreenActive = false;
+  document.body.classList.remove("simulated-fullscreen-active");
+  if (targetWrapEl) {
+    targetWrapEl.classList.remove("simulated-fullscreen");
+  }
+}
+
 async function toggleTargetWrapFullscreen() {
+  if (simulatedFullscreenActive) {
+    exitSimulatedFullscreen();
+    updateFullscreenButtonState();
+    return;
+  }
+
   if (isTargetWrapFullscreen()) {
     await exitDocumentFullscreen();
     return;
   }
-  await requestTargetWrapFullscreen();
+
+  if (!supportsNativeFullscreen()) {
+    enterSimulatedFullscreen();
+    testTarget.focus({ preventScroll: true });
+    statusEl.textContent = "Fullscreen API unavailable here. Using in-page fullscreen.";
+    updateFullscreenButtonState();
+    return;
+  }
+
+  try {
+    await requestTargetWrapFullscreen();
+  } catch (error) {
+    if (!(error instanceof DOMException)) {
+      throw error;
+    }
+    enterSimulatedFullscreen();
+    testTarget.focus({ preventScroll: true });
+    statusEl.textContent = "Fullscreen blocked here. Using in-page fullscreen.";
+    updateFullscreenButtonState();
+  }
 }
 
 function onFullscreenChange() {
+  if (simulatedFullscreenActive) {
+    exitSimulatedFullscreen();
+  }
   updateFullscreenButtonState();
   if (isTargetWrapFullscreen()) {
     testTarget.focus({ preventScroll: true });
   }
+}
+
+function onDocumentKeyDown(event) {
+  if (event.key !== "Escape" || !simulatedFullscreenActive) {
+    return;
+  }
+  exitSimulatedFullscreen();
+  updateFullscreenButtonState();
 }
 
 startBtn.addEventListener("click", () => setRunning(true));
@@ -324,6 +389,7 @@ copyJsonBtn.addEventListener("click", () => {
 downloadCsvBtn.addEventListener("click", downloadCsv);
 document.addEventListener("fullscreenchange", onFullscreenChange);
 document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+document.addEventListener("keydown", onDocumentKeyDown);
 
 updateFullscreenButtonState();
 render();
