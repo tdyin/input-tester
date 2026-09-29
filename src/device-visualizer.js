@@ -18,6 +18,13 @@ const STANDARD_GAMEPAD_AXIS_COUNT = 4;
 const STICK_TRAVEL = 14;
 const TRIGGER_WIDTH = 70;
 
+const DEVICES = [
+  { id: "keyboard", label: "Keyboard" },
+  { id: "mouse", label: "Mouse" },
+  { id: "gamepad", label: "Gamepads" },
+];
+const VISIBILITY_STORAGE_KEY = "input-tester:device-view";
+
 const KEYBOARD_LAYOUT = buildKeyboardLayout();
 const KEYBOARD_CODES = new Set(KEYBOARD_LAYOUT.map((key) => key.code));
 
@@ -32,6 +39,7 @@ export class DeviceVisualizer {
     this.wheelTimeouts = new Map();
     this.gamepadRafId = null;
     this.gamepadCards = new Map();
+    this.visible = loadVisibility();
 
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     this.boundOnKeyUp = this.onKeyUp.bind(this);
@@ -57,8 +65,8 @@ export class DeviceVisualizer {
     this.listen(window, "wheel", this.boundOnWheel, { capture: true, passive: true });
     this.listen(window, "blur", this.boundOnBlur);
 
-    if (typeof navigator.getGamepads === "function") {
-      this.gamepadRafId = requestAnimationFrame(this.boundPollGamepads);
+    if (this.visible.gamepad) {
+      this.startGamepadPolling();
     }
   }
 
@@ -69,10 +77,7 @@ export class DeviceVisualizer {
     this.handlers = [];
     this.running = false;
 
-    if (this.gamepadRafId !== null) {
-      cancelAnimationFrame(this.gamepadRafId);
-      this.gamepadRafId = null;
-    }
+    this.stopGamepadPolling();
     for (const timeoutId of this.wheelTimeouts.values()) {
       clearTimeout(timeoutId);
     }
@@ -85,11 +90,6 @@ export class DeviceVisualizer {
     this.renderKeyboard();
     this.mouseButtons = 0;
     this.renderMouse();
-    for (const card of this.gamepadCards.values()) {
-      card.el.remove();
-    }
-    this.gamepadCards.clear();
-    this.renderGamepadEmptyState();
     this.setIdle(true);
   }
 
@@ -102,11 +102,59 @@ export class DeviceVisualizer {
     this.root.classList.toggle("is-idle", idle);
   }
 
+  setDeviceVisible(deviceId, visible) {
+    this.visible[deviceId] = visible;
+    saveVisibility(this.visible);
+    this.applyVisibility();
+
+    if (deviceId === "gamepad" && this.running) {
+      if (visible) {
+        this.startGamepadPolling();
+      } else {
+        this.stopGamepadPolling();
+      }
+    }
+  }
+
+  applyVisibility() {
+    for (const { id } of DEVICES) {
+      this.panels[id].hidden = !this.visible[id];
+      this.toggleInputs[id].checked = this.visible[id];
+    }
+    this.panelRowEl.hidden = !this.visible.mouse && !this.visible.gamepad;
+    this.noneShownEl.hidden = DEVICES.some(({ id }) => this.visible[id]);
+  }
+
   // ---------------------------------------------------------------------------
   // DOM construction
 
   build() {
     this.root.innerHTML = "";
+
+    const toggles = document.createElement("div");
+    toggles.className = "device-toggles";
+    toggles.setAttribute("role", "group");
+    toggles.setAttribute("aria-label", "Devices to show");
+    this.toggleInputs = {};
+    for (const { id, label } of DEVICES) {
+      const toggleLabel = document.createElement("label");
+      toggleLabel.className = "device-toggle";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.setAttribute("role", "switch");
+      input.addEventListener("change", () => this.setDeviceVisible(id, input.checked));
+      const track = document.createElement("span");
+      track.className = "device-toggle-track";
+      track.setAttribute("aria-hidden", "true");
+      const text = document.createElement("span");
+      text.textContent = label;
+      toggleLabel.append(input, track, text);
+      toggles.appendChild(toggleLabel);
+      this.toggleInputs[id] = input;
+    }
+    this.noneShownEl = document.createElement("p");
+    this.noneShownEl.className = "device-note";
+    this.noneShownEl.textContent = "Turn on a device above to see its buttons light up while held.";
 
     const keyboardPanel = createPanel("Keyboard");
     const keyboardScroll = document.createElement("div");
@@ -149,7 +197,10 @@ export class DeviceVisualizer {
     gamepadPanel.append(this.gamepadListEl, this.gamepadEmptyEl);
     row.appendChild(gamepadPanel);
 
-    this.root.append(keyboardPanel, row);
+    this.panelRowEl = row;
+    this.panels = { keyboard: keyboardPanel, mouse: mousePanel, gamepad: gamepadPanel };
+    this.root.append(toggles, this.noneShownEl, keyboardPanel, row);
+    this.applyVisibility();
     this.renderKeyboard();
     this.renderGamepadEmptyState();
   }
@@ -428,6 +479,25 @@ export class DeviceVisualizer {
   // ---------------------------------------------------------------------------
   // Gamepads
 
+  startGamepadPolling() {
+    if (typeof navigator.getGamepads !== "function" || this.gamepadRafId !== null) {
+      return;
+    }
+    this.gamepadRafId = requestAnimationFrame(this.boundPollGamepads);
+  }
+
+  stopGamepadPolling() {
+    if (this.gamepadRafId !== null) {
+      cancelAnimationFrame(this.gamepadRafId);
+      this.gamepadRafId = null;
+    }
+    for (const card of this.gamepadCards.values()) {
+      card.el.remove();
+    }
+    this.gamepadCards.clear();
+    this.renderGamepadEmptyState();
+  }
+
   pollGamepads() {
     const seen = new Set();
     for (const gamepad of navigator.getGamepads()) {
@@ -453,9 +523,7 @@ export class DeviceVisualizer {
     }
     this.renderGamepadEmptyState();
 
-    if (this.running) {
-      this.gamepadRafId = requestAnimationFrame(this.boundPollGamepads);
-    }
+    this.gamepadRafId = requestAnimationFrame(this.boundPollGamepads);
   }
 
   renderGamepadEmptyState() {
@@ -468,6 +536,27 @@ export class DeviceVisualizer {
     } else {
       this.gamepadEmptyEl.textContent = "No gamepad detected. Press a button on a controller to connect it.";
     }
+  }
+}
+
+function loadVisibility() {
+  const visible = Object.fromEntries(DEVICES.map(({ id }) => [id, false]));
+  try {
+    const saved = JSON.parse(localStorage.getItem(VISIBILITY_STORAGE_KEY) || "{}");
+    for (const { id } of DEVICES) {
+      visible[id] = saved[id] === true;
+    }
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data); start with everything hidden.
+  }
+  return visible;
+}
+
+function saveVisibility(visible) {
+  try {
+    localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(visible));
+  } catch {
+    // Ignore; the choice just won't be remembered.
   }
 }
 

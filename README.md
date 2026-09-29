@@ -19,7 +19,7 @@ The application displays real-time statistics including:
 - Event source (keyboard, mouse, gamepad, etc.)
 - First and latest input timestamps
 
-A **Device view** shows which buttons are held right now:
+A **Device view** shows which buttons are held right now. Use its switches to pick which devices to show; all are off by default, and the choice is remembered in that browser:
 - **Keyboard** — a full-size (tenkeyless) layout; keys outside it, such as the numpad, are listed by name
 - **Mouse** — left, right, middle, back and forward buttons, plus wheel and tilt direction
 - **Gamepads** — one diagram per connected pad, with analog triggers and stick positions; controllers without the standard mapping (such as many VR controllers) are shown as numbered buttons and axis bars
@@ -53,7 +53,7 @@ All captured data can be exported as JSON or CSV for analysis.
 
 1. Click **Start** to begin capturing input events
 2. Interact with the "Capture input here" box using keyboard, mouse, touch, gamepad, or VR controllers (the page never enters VR mode)
-3. Watch the Device view highlight held buttons, and the input log update in real-time with all captured events
+3. Turn on the devices you want in the Device view to see held buttons highlighted, and watch the input log update in real-time with all captured events
 4. Use **Stop** to pause capturing
 5. Use **Reset** to clear all recorded data
 6. Use **Fullscreen Input** to make the capture area fill the screen (press `Esc` to exit). If browser/device policies block native fullscreen, the app falls back to an in-page fullscreen mode.

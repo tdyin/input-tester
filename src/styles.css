@@ -178,8 +178,69 @@ button:disabled {
   gap: 12px;
 }
 
-.device-view.is-idle {
+.device-view.is-idle .device-panel {
   opacity: 0.6;
+}
+
+.device-view [hidden] {
+  display: none;
+}
+
+.device-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.device-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.device-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.device-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #cbd5e1;
+  transition: background-color 150ms ease;
+}
+
+.device-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.3);
+  transition: transform 150ms ease;
+}
+
+.device-toggle input:checked + .device-toggle-track {
+  background: #2563eb;
+}
+
+.device-toggle input:checked + .device-toggle-track::after {
+  transform: translateX(16px);
+}
+
+.device-toggle input:focus-visible + .device-toggle-track {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .device-panel {
@@ -197,9 +258,17 @@ button:disabled {
 }
 
 .device-row {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+}
+
+.device-row > .device-panel {
+  flex: 1 1 160px;
+}
+
+.device-row > .gamepad-panel {
+  flex: 3 1 300px;
 }
 
 .device-note {
@@ -403,8 +472,3 @@ button:disabled {
   background: #2563eb;
 }
 
-@media (max-width: 560px) {
-  .device-row {
-    grid-template-columns: 1fr;
-  }
-}
