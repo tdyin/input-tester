@@ -19,6 +19,11 @@ The application displays real-time statistics including:
 - Event source (keyboard, mouse, gamepad, etc.)
 - First and latest input timestamps
 
+A **Device view** shows which buttons are held right now:
+- **Keyboard** — a full-size (tenkeyless) layout; keys outside it, such as the numpad, are listed by name
+- **Mouse** — left, right, middle, back and forward buttons, plus wheel and tilt direction
+- **Gamepads** — one diagram per connected pad, with analog triggers and stick positions; controllers without the standard mapping (such as many VR controllers) are shown as numbered buttons and axis bars
+
 All captured data can be exported as JSON or CSV for analysis.
 
 ## How to Run
@@ -48,7 +53,7 @@ All captured data can be exported as JSON or CSV for analysis.
 
 1. Click **Start** to begin capturing input events
 2. Interact with the "Capture input here" box using keyboard, mouse, touch, gamepad, or VR controllers (the page never enters VR mode)
-3. Watch the input log update in real-time with all captured events
+3. Watch the Device view highlight held buttons, and the input log update in real-time with all captured events
 4. Use **Stop** to pause capturing
 5. Use **Reset** to clear all recorded data
 6. Use **Fullscreen Input** to make the capture area fill the screen (press `Esc` to exit). If browser/device policies block native fullscreen, the app falls back to an in-page fullscreen mode.
@@ -63,6 +68,7 @@ input-tester/
 ├── src/
 │   ├── main.js          # Application logic and event handling
 │   ├── input-capture.js # InputCapture class for monitoring all input types
+│   ├── device-visualizer.js # DeviceVisualizer class for the live Device view
 │   └── styles.css       # Styling
 └── README.md            # This file
 ```
@@ -72,4 +78,5 @@ input-tester/
 The application is built with vanilla JavaScript (no frameworks required). The main components are:
 
 - **InputCapture** — Handles all event listener setup and input monitoring
+- **DeviceVisualizer** — Tracks held keys, mouse buttons and gamepad state, and draws the Device view
 - **main.js** — Manages UI updates, data storage, and export functionality
