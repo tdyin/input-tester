@@ -11,7 +11,7 @@ Input Tester is a comprehensive input event capture tool that monitors and recor
 - **Touch input** — Touch coordinates and events
 - **Wheel events** — Mouse wheel scrolling
 - **Gamepad input** — Gamepad button presses and analog stick values
-- **XR (Virtual Reality)** — WebXR controller input and selection/squeeze events
+- **VR controllers** — Captured from the regular 2D browser (no immersive VR session is started): controller trigger/laser clicks arrive as pointer events, and any controllers the browser exposes through the Gamepad API are logged as gamepads
 
 The application displays real-time statistics including:
 - Current input value
@@ -31,7 +31,7 @@ All captured data can be exported as JSON or CSV for analysis.
 
 1. Navigate to the project directory:
    ```bash
-   cd /input-tester
+   cd input-tester
    ```
 
 2. Start a local HTTP server:
@@ -47,7 +47,7 @@ All captured data can be exported as JSON or CSV for analysis.
 ### Using the Interface
 
 1. Click **Start** to begin capturing input events
-2. Interact with the "Capture input here" box using keyboard, mouse, touch, gamepad, or VR controllers
+2. Interact with the "Capture input here" box using keyboard, mouse, touch, gamepad, or VR controllers (the page never enters VR mode)
 3. Watch the input log update in real-time with all captured events
 4. Use **Stop** to pause capturing
 5. Use **Reset** to clear all recorded data
