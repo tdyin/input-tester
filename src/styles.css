@@ -167,3 +167,314 @@ button:disabled {
   margin: 0;
   color: #64748b;
 }
+
+.app > section {
+  min-width: 0;
+}
+
+.device-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.device-view.is-idle .device-panel {
+  border-style: dashed;
+}
+
+.device-view [hidden] {
+  display: none;
+}
+
+.device-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.device-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.device-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.device-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #cbd5e1;
+  transition: background-color 150ms ease;
+}
+
+.device-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.3);
+  transition: transform 150ms ease;
+}
+
+.device-toggle input:checked + .device-toggle-track {
+  background: #2563eb;
+}
+
+.device-toggle input:checked + .device-toggle-track::after {
+  transform: translateX(16px);
+}
+
+.device-toggle input:focus-visible + .device-toggle-track {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.device-panel {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+  min-width: 0;
+}
+
+.device-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.device-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.device-row > .device-panel {
+  flex: 1 1 160px;
+}
+
+.device-row > .gamepad-panel {
+  flex: 3 1 300px;
+}
+
+.device-note {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.device-note:empty {
+  display: none;
+}
+
+.device-summary {
+  margin: 0;
+  color: #334155;
+  font-weight: 600;
+}
+
+.vd-chip {
+  display: inline-block;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #334155;
+  background: #f1f5f9;
+  transition:
+    background-color 250ms ease,
+    color 250ms ease,
+    border-color 250ms ease;
+}
+
+.vd-chip.pressed {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  transition: none;
+}
+
+/* Keyboard */
+
+.vk-scroll {
+  overflow-x: auto;
+}
+
+.vk-board {
+  position: relative;
+  min-width: 560px;
+  container-type: inline-size;
+}
+
+.vk-key {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  background: #e2e8f0;
+  background-clip: padding-box;
+  color: #334155;
+  font-size: clamp(9px, 1.6cqi, 13px);
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    background-color 250ms ease,
+    color 250ms ease;
+}
+
+.vk-key.pressed {
+  background-color: #2563eb;
+  color: #ffffff;
+  transition: none;
+}
+
+/* Mouse and gamepad SVGs */
+
+.vm-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.vm-svg {
+  width: 100%;
+  max-width: 120px;
+}
+
+.vm-wheel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.vd-body {
+  fill: #f1f5f9;
+}
+
+.vd-outline {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 2;
+}
+
+.vd-button {
+  fill: #e2e8f0;
+  stroke: #94a3b8;
+  stroke-width: 1.5;
+  transition: fill 250ms ease;
+}
+
+.vd-button.pressed {
+  fill: #2563eb;
+  transition: none;
+}
+
+.vd-label {
+  fill: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.vd-label.pressed {
+  fill: #ffffff;
+}
+
+.gp-stick-base {
+  fill: #cbd5e1;
+}
+
+.gp-dpad-center {
+  fill: #e2e8f0;
+}
+
+.gp-trigger-fill {
+  fill: #2563eb;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.gamepad-list {
+  display: grid;
+  gap: 12px;
+}
+
+.gamepad-name {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.gp-svg {
+  width: 100%;
+  max-width: 360px;
+  display: block;
+}
+
+.gp-generic-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.gp-axes {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.gp-axis {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.gp-axis-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: #e2e8f0;
+}
+
+.gp-axis-track::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: #94a3b8;
+}
+
+.gp-axis-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-radius: 4px;
+  background: #2563eb;
+}
+

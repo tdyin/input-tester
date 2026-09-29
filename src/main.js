@@ -1,3 +1,4 @@
+import { DeviceVisualizer } from "./device-visualizer.js";
 import { InputCapture } from "./input-capture.js";
 
 const startBtn = document.getElementById("start-btn");
@@ -9,6 +10,7 @@ const downloadCsvBtn = document.getElementById("download-csv-btn");
 const testTarget = document.getElementById("test-target");
 const targetWrapEl = document.querySelector(".target-wrap");
 const inputLogEl = document.getElementById("input-log");
+const deviceViewEl = document.getElementById("device-view");
 const statusEl = document.getElementById("status");
 const currentInputValueEl = document.getElementById("current-input-value");
 
@@ -39,6 +41,8 @@ const localDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   fractionalSecondDigits: 3,
   hour12: false,
 });
+
+const deviceVisualizer = new DeviceVisualizer(deviceViewEl, testTarget);
 
 const inputCapture = new InputCapture(testTarget, (eventType, eventTimeStamp, inputValue) => {
   if (!running) {
@@ -164,11 +168,13 @@ function setRunning(next) {
   running = next;
   if (running) {
     inputCapture.start();
+    deviceVisualizer.start();
     statusEl.textContent = "Running";
     startBtn.disabled = true;
     stopBtn.disabled = false;
   } else {
     inputCapture.stop();
+    deviceVisualizer.stop();
     if (inputCueTimeoutId !== null) {
       clearTimeout(inputCueTimeoutId);
       inputCueTimeoutId = null;
