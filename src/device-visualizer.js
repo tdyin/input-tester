@@ -13,7 +13,14 @@ const MOUSE_BUTTONS = [
   { bit: 16, name: "Forward" },
 ];
 
-const STANDARD_GAMEPAD_BUTTON_COUNT = 18;
+// The W3C "standard" mapping defines buttons 0-16; anything beyond that is
+// device-specific and is shown as a numbered chip.
+const STANDARD_GAMEPAD_BUTTON_NAMES = [
+  "A/Cross", "B/Circle", "X/Square", "Y/Triangle", "Left Bumper", "Right Bumper",
+  "Left Trigger", "Right Trigger", "Select/Back", "Start", "Left Stick", "Right Stick",
+  "D-pad Up", "D-pad Down", "D-pad Left", "D-pad Right", "Home",
+];
+const STANDARD_GAMEPAD_BUTTON_COUNT = STANDARD_GAMEPAD_BUTTON_NAMES.length;
 const STANDARD_GAMEPAD_AXIS_COUNT = 4;
 const STICK_TRAVEL = 14;
 const TRIGGER_WIDTH = 70;
@@ -24,6 +31,7 @@ const DEVICES = [
   { id: "gamepad", label: "Gamepads" },
 ];
 const VISIBILITY_STORAGE_KEY = "input-tester:device-view";
+const SUMMARY_INTERVAL_MS = 300;
 
 const KEYBOARD_LAYOUT = buildKeyboardLayout();
 const KEYBOARD_CODES = new Set(KEYBOARD_LAYOUT.map((key) => key.code));
@@ -40,6 +48,7 @@ export class DeviceVisualizer {
     this.gamepadRafId = null;
     this.gamepadCards = new Map();
     this.visible = loadVisibility();
+    this.summaryTimeoutId = null;
 
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     this.boundOnKeyUp = this.onKeyUp.bind(this);
@@ -93,6 +102,43 @@ export class DeviceVisualizer {
     this.setIdle(true);
   }
 
+  // A throttled, text-only description of what is held, for screen readers
+  // (the region is aria-live) and anyone who prefers text to the diagrams.
+  requestSummary() {
+    if (this.summaryTimeoutId !== null) {
+      return;
+    }
+    this.summaryTimeoutId = setTimeout(() => {
+      this.summaryTimeoutId = null;
+      this.renderSummary();
+    }, SUMMARY_INTERVAL_MS);
+  }
+
+  renderSummary() {
+    let text = "";
+    if (this.running && DEVICES.some(({ id }) => this.visible[id])) {
+      const parts = [];
+      if (this.visible.keyboard && this.heldKeys.size > 0) {
+        parts.push(`Keys ${[...this.heldKeys].map(keyName).join(" + ")}`);
+      }
+      if (this.visible.mouse && this.mouseButtons !== 0) {
+        const names = MOUSE_BUTTONS.filter(({ bit }) => (this.mouseButtons & bit) !== 0).map(({ name }) => name);
+        parts.push(`Mouse ${names.join(" + ")}`);
+      }
+      if (this.visible.gamepad) {
+        for (const [index, card] of this.gamepadCards) {
+          if (card.heldNames.length > 0) {
+            parts.push(`Pad ${index + 1} ${card.heldNames.join(" + ")}`);
+          }
+        }
+      }
+      text = `Held: ${parts.length > 0 ? parts.join("; ") : "nothing"}`;
+    }
+    if (this.summaryEl.textContent !== text) {
+      this.summaryEl.textContent = text;
+    }
+  }
+
   listen(target, type, handler, options) {
     target.addEventListener(type, handler, options);
     this.handlers.push(() => target.removeEventListener(type, handler, options));
@@ -100,6 +146,14 @@ export class DeviceVisualizer {
 
   setIdle(idle) {
     this.root.classList.toggle("is-idle", idle);
+    this.applyVisibility();
+    if (idle) {
+      clearTimeout(this.summaryTimeoutId);
+      this.summaryTimeoutId = null;
+      this.renderSummary();
+    } else {
+      this.requestSummary();
+    }
   }
 
   setDeviceVisible(deviceId, visible) {
@@ -122,7 +176,10 @@ export class DeviceVisualizer {
       this.toggleInputs[id].checked = this.visible[id];
     }
     this.panelRowEl.hidden = !this.visible.mouse && !this.visible.gamepad;
-    this.noneShownEl.hidden = DEVICES.some(({ id }) => this.visible[id]);
+    const anyShown = DEVICES.some(({ id }) => this.visible[id]);
+    this.noneShownEl.hidden = anyShown;
+    this.idleNoteEl.hidden = !anyShown || this.running;
+    this.requestSummary();
   }
 
   // ---------------------------------------------------------------------------
@@ -155,12 +212,22 @@ export class DeviceVisualizer {
     this.noneShownEl = document.createElement("p");
     this.noneShownEl.className = "device-note";
     this.noneShownEl.textContent = "Turn on a device above to see its buttons light up while held.";
+    this.idleNoteEl = document.createElement("p");
+    this.idleNoteEl.className = "device-note";
+    this.idleNoteEl.textContent = "Capture is stopped. Press Start to see live input.";
+    this.summaryEl = document.createElement("p");
+    this.summaryEl.className = "device-note device-summary";
+    this.summaryEl.setAttribute("aria-live", "polite");
+    this.summaryEl.setAttribute("aria-atomic", "true");
 
     const keyboardPanel = createPanel("Keyboard");
     const keyboardScroll = document.createElement("div");
     keyboardScroll.className = "vk-scroll";
     const board = document.createElement("div");
     board.className = "vk-board";
+    // The individual keys are presentational; held keys are announced by the summary.
+    board.setAttribute("role", "img");
+    board.setAttribute("aria-label", "Keyboard layout");
     board.style.aspectRatio = `${KEYBOARD_WIDTH_UNITS} / ${KEYBOARD_HEIGHT_UNITS}`;
     this.keyEls = new Map();
     for (const key of KEYBOARD_LAYOUT) {
@@ -199,7 +266,7 @@ export class DeviceVisualizer {
 
     this.panelRowEl = row;
     this.panels = { keyboard: keyboardPanel, mouse: mousePanel, gamepad: gamepadPanel };
-    this.root.append(toggles, this.noneShownEl, keyboardPanel, row);
+    this.root.append(toggles, this.noneShownEl, this.idleNoteEl, this.summaryEl, keyboardPanel, row);
     this.applyVisibility();
     this.renderKeyboard();
     this.renderGamepadEmptyState();
@@ -267,6 +334,7 @@ export class DeviceVisualizer {
       buttonEls: new Map(),
       triggerFills: new Map(),
       stickDots: [],
+      heldNames: [],
       labelEls: new Map(),
       genericButtonEls: new Map(),
       axisFills: new Map(),
@@ -366,20 +434,14 @@ export class DeviceVisualizer {
     button(2, "circle", { cx: 213, cy: 100, r: 12 }, "X");
     button(3, "circle", { cx: 235, cy: 78, r: 12 }, "Y");
 
-    // Center cluster: select (8), start (9), home (16), touchpad (17).
-    button(17, "rect", { x: 130, y: 56, width: 60, height: 24, rx: 6 });
+    // Center cluster: select (8), start (9), home (16).
     button(8, "rect", { x: 126, y: 90, width: 18, height: 10, rx: 5 });
     button(9, "rect", { x: 176, y: 90, width: 18, height: 10, rx: 5 });
     button(16, "circle", { cx: 160, cy: 122, r: 9 });
 
-    const names = [
-      "A/Cross", "B/Circle", "X/Square", "Y/Triangle", "Left Bumper", "Right Bumper",
-      "Left Trigger", "Right Trigger", "Select/Back", "Start", "Left Stick", "Right Stick",
-      "D-pad Up", "D-pad Down", "D-pad Left", "D-pad Right", "Home", "Touchpad",
-    ];
     for (const [index, shape] of card.buttonEls) {
       const title = svgEl("title", {}, shape);
-      title.textContent = names[index];
+      title.textContent = STANDARD_GAMEPAD_BUTTON_NAMES[index];
     }
 
     return svg;
@@ -410,6 +472,7 @@ export class DeviceVisualizer {
     }
     const extras = [...this.heldKeys].filter((id) => !KEYBOARD_CODES.has(id));
     this.extraKeysEl.textContent = extras.length > 0 ? `Other keys held: ${extras.join(", ")}` : "";
+    this.requestSummary();
   }
 
   // ---------------------------------------------------------------------------
@@ -463,6 +526,7 @@ export class DeviceVisualizer {
       this.mouseEls.get(bit).classList.toggle("pressed", pressed);
       this.mouseLabelEls.get(bit)?.classList.toggle("pressed", pressed);
     }
+    this.requestSummary();
   }
 
   isOnTarget(event) {
@@ -496,6 +560,7 @@ export class DeviceVisualizer {
     }
     this.gamepadCards.clear();
     this.renderGamepadEmptyState();
+    this.requestSummary();
   }
 
   pollGamepads() {
@@ -522,6 +587,7 @@ export class DeviceVisualizer {
       }
     }
     this.renderGamepadEmptyState();
+    this.requestSummary();
 
     this.gamepadRafId = requestAnimationFrame(this.boundPollGamepads);
   }
@@ -561,6 +627,14 @@ function saveVisibility(visible) {
 }
 
 function updateGamepadCard(card, gamepad) {
+  const standard = gamepad.mapping === "standard";
+  card.heldNames = [];
+  gamepad.buttons.forEach((button, index) => {
+    if (button.pressed) {
+      card.heldNames.push((standard && STANDARD_GAMEPAD_BUTTON_NAMES[index]) || `B${index}`);
+    }
+  });
+
   for (const [index, shape] of card.buttonEls) {
     const pressed = Boolean(gamepad.buttons[index]?.pressed);
     shape.classList.toggle("pressed", pressed);
@@ -584,6 +658,10 @@ function updateGamepadCard(card, gamepad) {
     fill.style.width = `${Math.abs(value) * 50}%`;
     fill.style.left = value < 0 ? `${50 - Math.abs(value) * 50}%` : "50%";
   }
+}
+
+function keyName(id) {
+  return id.replace(/^(Key|Digit)(?=.)/, "");
 }
 
 function keyId(event) {

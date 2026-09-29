@@ -179,7 +179,7 @@ button:disabled {
 }
 
 .device-view.is-idle .device-panel {
-  opacity: 0.6;
+  border-style: dashed;
 }
 
 .device-view [hidden] {
@@ -279,6 +279,12 @@ button:disabled {
 
 .device-note:empty {
   display: none;
+}
+
+.device-summary {
+  margin: 0;
+  color: #334155;
+  font-weight: 600;
 }
 
 .vd-chip {
