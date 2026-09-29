@@ -81,7 +81,6 @@ function formatSource(eventType) {
     touch: "Touch",
     pen: "Pen",
     gamepad: "Gamepad",
-    xr: "WebXR",
     pointer: "Pointer",
   };
 
@@ -178,6 +177,7 @@ function setRunning(next) {
     statusEl.textContent = "Stopped";
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    render();
   }
 }
 
@@ -194,7 +194,7 @@ function resetAll() {
     inputCueTimeoutId = null;
   }
   testTarget.classList.remove("input-received");
-  statusEl.textContent = "Idle";
+  statusEl.textContent = running ? "Running" : "Idle";
   render();
 }
 
